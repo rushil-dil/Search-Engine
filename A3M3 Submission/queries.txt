@@ -1,0 +1,170 @@
+Assignment 3 Milestone 3 — Test Queries
+========================================
+
+We evaluated our search engine on 30 queries. At least 15 were chosen because
+they initially performed poorly on ranking quality or runtime. The other half
+performed well from the start.
+
+
+QUERIES THAT INITIALLY PERFORMED POORLY
+----------------------------------------
+
+1.  data structures
+    Problem: The top result was mondego.ics.uci.edu/datasets/maven-contents.txt,
+    a large plaintext file listing Maven packages. It dominated purely because of
+    its length — it contains many tokens, inflating its raw TF-IDF score.
+    Fix: Switched to BM25 scoring, which normalises term frequency by document
+    length, so long junk files no longer dominate.
+
+2.  database systems
+    Problem: Same mondego/maven-contents.txt issue as above.
+    Fix: BM25 length normalisation (same fix).
+
+3.  network security
+    Problem: Same mondego/maven-contents.txt issue.
+    Fix: BM25 length normalisation.
+
+4.  python programming tutorial
+    Problem: Same mondego/maven-contents.txt issue.
+    Fix: BM25 length normalisation.
+
+5.  what is machine learning
+    Problem: Stop words "what" and "is" were included in the query. Because they
+    appear in almost every document, they pulled unrelated pages to the top and
+    distorted IDF weighting.
+    Fix: Added a stop word list; "what", "is", and similar function words are
+    stripped before stemming and lookup.
+
+6.  how to apply for graduate school
+    Problem: Most tokens ("how", "to", "for") are stop words. The effective
+    search was over "apply", "graduate", "school", which returned irrelevant
+    top results (CML AI pages).
+    Fix: Stop word removal produces the meaningful sub-query "apply graduate
+    school", which now surfaces the correct funding/admissions pages.
+
+7.  who is the dean of ics
+    Problem: "who", "is", "the", "of" are all stop words, leaving only "dean"
+    and "ics" — but raw TF-IDF still pulled in noisy news pages.
+    Fix: Stop word removal + BM25 now correctly ranks the dean's award page.
+
+8.  best professor at uci
+    Problem: "best", "at" contributed noise; the top result was a best-paper
+    award page unrelated to a professor profile.
+    Fix: Stop word removal drops "at"; BM25 improves ranking.
+
+9.  cristina lopes
+    Problem: The top result was a different faculty member's page. The name
+    "Cristina" has low frequency but the stemmer collapses it unpredictably.
+    Fix: BM25's IDF component gives proper weight to rare name tokens, and
+    soft AND ensures both name parts must appear.
+
+10. crista lopes research
+    Problem: Top result was a generic news notes archive page with no focus
+    on Crista Lopes.
+    Fix: BM25 + stop word removal (drops nothing here, but better IDF weighting)
+    now surfaces the correct informatics faculty recognition page.
+
+11. web crawling scraping
+    Problem: Strict AND intersection returned only 3 documents — any page missing
+    any one of the three terms was excluded entirely.
+    Fix: Implemented soft AND. For 3-term queries we now require at least 2 terms
+    to match, then rank by BM25 score. Result count went from 3 to 309.
+
+12. summer internship 2020
+    Problem: Strict AND with a rare specific year token ("2020") produced only
+    19 results.
+    Fix: Soft AND relaxes to requiring 2 of 3 terms; result count rose to 350.
+
+13. graph algorithm complexity analysis
+    Problem: Strict AND over 4 stemmed terms was too restrictive; many relevant
+    pages missing one term were excluded.
+    Fix: Soft AND (3 of 4 terms required) expanded results from 178 to 783 while
+    the top result (Eppstein's glossary) is highly relevant.
+
+14. natural language processing research group
+    Problem: 5-term query with strict AND returned few results and a poor top hit
+    (a biography page).
+    Fix: Soft AND (4 of 5 required) expands the result set to 1,582 documents
+    with more focused top results.
+
+15. phd application deadline
+    Problem: Very few results (27) because strict AND excluded pages that used
+    "deadline" without also saying "phd" and "application" together.
+    Fix: Soft AND raised result count to 3,582.
+
+
+QUERIES THAT PERFORMED WELL FROM THE START
+-------------------------------------------
+
+16. machine learning
+    Good top results (CML lab pages), 54 ms query time.
+
+17. artificial intelligence
+    Correct top result (publications page with heavy AI content), under 2 ms.
+
+18. information retrieval
+    Top result is the MARS project page at www-db.ics.uci.edu, which is the ICS
+    information retrieval research group. Highly relevant.
+
+19. neural networks
+    Top result is the EMJ lab's neural-network papers page. Correct and fast.
+
+20. computer graphics
+    Top result is graphics.ics.uci.edu publication list. Correct.
+
+21. software engineering
+    Top result is a faculty teaching page focused on SE. Correct.
+
+22. undergraduate admission requirements
+    Returns the Second BA degrees page from the ICS undergrad section. Correct.
+
+23. operating systems homework assignment
+    Top result is Aburtsev's OS course page with assignments listed. Correct.
+
+24. donald bren school
+    Correctly surfaces the Bren Hall about page on ics.uci.edu.
+
+25. graduate student funding
+    Correctly surfaces ics.uci.edu/grad/funding/ as the top result.
+
+26. machine learning course syllabus
+    Top result is the SLI course page (ICS 178) with a full syllabus. Correct.
+
+27. computer science
+    Very common terms; returns a reasonable first-course syllabus page with
+    heavy "computer science" usage in headings.
+
+28. online courses free
+    Returns a relevant page listing online resources for ICS courses.
+
+29. uci ics faculty directory
+    Surfaces new-psearch.ics.uci.edu/about, which is the ICS people search
+    tool — a very relevant result.
+
+30. ics uci edu
+    Very high-frequency terms; returns a broad UCI people directory. Acceptable
+    given the non-specific nature of the query.
+
+
+SUMMARY OF IMPROVEMENTS
+------------------------
+
+All 15 poorly-performing queries were improved by three general-purpose changes:
+
+1. BM25 scoring (replacing raw TF-IDF): normalises term frequency by document
+   length, preventing long low-quality files from dominating results.
+   Parameters: k1=1.5, b=0.75 (standard defaults).
+
+2. Stop word removal: a set of ~60 common English function words is stripped
+   from the query before stemming. This prevents noise terms from skewing IDF
+   and wasting lookup time. If removal would leave the query empty, the full
+   token list is used as a fallback.
+
+3. Soft AND: for queries with more than 2 terms we require docs to contain at
+   least (n-1) of the n query terms rather than all n. This relaxes over-strict
+   intersection without fully opening up to OR semantics. Docs that satisfy all
+   terms still rank highest via BM25.
+
+These changes are all general-purpose: they improve retrieval without being
+tuned to specific queries. All queries remain well under the 300 ms response
+time limit (worst observed: ~100 ms for very high-frequency 3-term queries).
